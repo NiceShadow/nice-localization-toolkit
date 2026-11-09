@@ -92,7 +92,20 @@ a.btn{text-decoration:none;display:inline-block}
 .saving{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.1;letter-spacing:-.02em;font-weight:700}
 .saving .from{color:var(--ink-2);text-decoration:line-through;text-decoration-thickness:2px;font-weight:400}
 .saving-note{color:var(--ink-2);grid-column:1}
-.progress{grid-column:2;grid-row:1 / span 2;align-self:center}
+.progress{grid-column:2;grid-row:2 / span 2;align-self:center}
+.summary .skip-toggle{grid-column:1 / -1;margin:0 0 6px;font-size:.92rem;color:var(--ink-2)}
+.saving-note .btn.quiet{padding:0 4px;color:var(--accent);font-weight:700}
+.row.skipped{opacity:.6}
+.skip-tag{color:var(--ink-2);font-weight:700}
+.skip-box{max-width:660px}
+.skip-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.skip-tools .search{flex:1 1 180px}
+.skip-list{max-height:min(60vh,480px);overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.skip-item{display:flex;align-items:center;gap:12px;padding:7px 12px;border-bottom:1px solid var(--surface-2)}
+.skip-item:last-child{border-bottom:0}
+.skip-item .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:.9rem}
+.skip-item small{color:var(--ink-2);white-space:nowrap}
+.skip-empty{padding:16px;color:var(--ink-2);text-align:center}
 .progress-label{display:flex;justify-content:space-between;font-size:.95rem;color:var(--ink-2);margin-bottom:6px}
 .progress-label b{color:var(--ink)}
 .meter{height:10px;border-radius:5px;background:var(--surface-2);overflow:hidden}
@@ -156,6 +169,12 @@ select.folder{max-width:260px}
 .check{display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer}
 .check input{width:18px;height:18px;accent-color:var(--accent)}
 .sheet-langs{display:flex;flex-wrap:wrap;gap:2px 18px;margin:0 0 6px 26px}
+.sheet-folders{margin:0 0 6px 26px}
+.folder-tree{max-height:240px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--bg)}
+.folder-tree .check{margin:3px 0}
+.folder-tree .check.implied{opacity:.5;cursor:default}
+.folder-tree .count{color:var(--ink-2);font-size:.85rem}
+.folder-all{font-size:.9rem}
 .sheet-langs .check{margin:4px 0}
 .sheet-note{font-size:.9rem}
 .modal-actions.split{justify-content:space-between;flex-wrap:wrap;margin-top:18px}
@@ -275,6 +294,7 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
 
   <section id="work" hidden>
     <div class="summary">
+      <label class="check skip-toggle"><input type="checkbox" id="hideSkip" checked> Hide texts that don’t need translating (only numbers, symbols or placeholders)</label>
       <div class="saving" id="saving"></div>
       <div class="saving-note" id="savingNote"></div>
       <div class="progress">
@@ -307,6 +327,21 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
   </section>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="modal" id="skipModal" hidden role="dialog" aria-modal="true" aria-labelledby="skipTitle">
+  <div class="modal-box wide skip-box">
+    <button class="modal-x" id="skipX" aria-label="Close">×</button>
+    <h2 id="skipTitle">Texts that don’t need translating</h2>
+    <p class="sheet-note">Texts that don’t need translating are left out of the counts and percentages. Texts with only numbers, symbols, placeholders, single characters or links are found automatically. Ctrl+Z and Ctrl+Y work here too.</p>
+    <div class="skip-tools">
+      <div class="seg" id="skipTabs" role="group" aria-label="Show">
+        <button data-tab="skip" aria-pressed="true">Don’t translate<span class="n"></span></button>
+        <button data-tab="keep" aria-pressed="false">To translate<span class="n"></span></button>
+      </div>
+      <input type="search" class="search" id="skipSearch" placeholder="Search" aria-label="Search these texts">
+    </div>
+    <div class="skip-list" id="skipList"></div>
+  </div>
+</div>
 <div class="modal" id="openModal" hidden role="dialog" aria-modal="true" aria-labelledby="openTitle">
   <div class="modal-box wide">
     <button class="modal-x" id="openX" aria-label="Cancel">×</button>
@@ -336,7 +371,11 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
     <p class="sheet-note">Translate in Excel, Google Sheets or LibreOffice, then import the file here. Each unique text is one row. Don’t change the first column: it’s used to find the texts again. Empty cells change nothing, and languages that aren’t in the file stay as they are.</p>
     <label class="check"><input type="checkbox" id="sheetAll" checked> All languages</label>
     <div class="sheet-langs" id="sheetLangs" hidden></div>
-    <label class="check" id="sheetFolderWrap" hidden><input type="checkbox" id="sheetFolderOnly"> <span id="sheetFolderName"></span></label>
+    <label class="check"><input type="checkbox" id="sheetAllFolders" checked> All folders</label>
+    <div class="sheet-folders" id="sheetFolders" hidden>
+      <div class="folder-tree" id="sheetFolderTree" role="group" aria-label="Folders to export"></div>
+      <label class="check folder-all"><input type="checkbox" id="sheetFoldersToggle"> Select all folders</label>
+    </div>
     <div class="modal-actions split">
       <button class="btn primary" id="sheetExport">Download Excel file</button>
       <button class="btn" id="sheetImport">Import Excel file…</button>
@@ -1917,7 +1956,7 @@ function loadJson(json, fileName, fromSession){
   S.entries = json.entries.map((e,i) => {
     const tr = {}; S.cultures.forEach(c => tr[c] = (e.translations && typeof e.translations[c]==="string") ? e.translations[c] : "");
     const location = e.location||"";
-    return { i, ns:e.namespace||"", key:e.key||"", source:e.source||"", location, folder:e.folder||folderFromLocation(location), tr, outdated:e.outdated||{}, split:!!e._split };
+    return { i, ns:e.namespace||"", key:e.key||"", source:e.source||"", location, folder:e.folder||folderFromLocation(location), tr, outdated:e.outdated||{}, split:!!e._split, skip:(typeof e._skip === "boolean" ? e._skip : undefined) };
   });
   S.culture = S.cultures.includes(S.culture) ? S.culture : (S.cultures[0] || null);
   buildGroups();
@@ -2021,6 +2060,7 @@ function mergeWith(json, name){
     }
     const out = Object.assign({}, be, { translations: tr });
     delete out._split; if(c && c._split) out._split = true;
+    delete out._skip; if(c && typeof c._skip === "boolean") out._skip = c._skip;
     return out;
   });
   const newTexts = base === json ? entries.filter(e => !curMap.has(k(e))).length : 0;
@@ -2060,6 +2100,7 @@ function restoreSnapshot(snap){
   S.folder = snap.folder; S.editLangs = snap.editLangs; S.limit = snap.limit || 60;
   renderFolders(); renderAll(); saveSession();
   window.scrollTo(0, y);
+  if(!$("skipModal").hidden) renderSkipList();
   if(focusId){
     const row = [...document.querySelectorAll(".row")].find(r => r.dataset.g === focusId);
     const t = row && row.querySelector("textarea.tr");
@@ -2085,6 +2126,10 @@ function renderUndo(){
   if(undoStack.length) $("undoBtn").title = `Undo: ${undoStack[undoStack.length - 1].label} (Ctrl+Z)`;
   if(redoStack.length) $("redoBtn").title = `Redo: ${redoStack[redoStack.length - 1].label} (Ctrl+Y)`;
 }
+/* Row ids are encoded, because the browser turns Windows line breaks (\r\n) inside attributes into \n,
+   which made texts with several lines impossible to find again. */
+const rowId = g => encodeURIComponent(g.id);
+const groupOf = el => { try{ return S.gmap.get(decodeURIComponent(el.dataset.g)); }catch(e){ return null; } };
 const shortText = t => { t = String(t).replace(/\s+/g, " ").trim(); return t.length > 30 ? t.slice(0, 29) + "…" : t; };
 
 /* ---------- Groups ---------- */
@@ -2121,8 +2166,52 @@ function propagateExisting(){
   }
   return n;
 }
+/* Texts that don't need translating: automatic (no letters once placeholders and tags are removed)
+   or marked by hand. A hand-made choice always wins over the automatic one. */
+function autoSkip(text){
+  const raw = String(text).trim();
+  // "x", "X", "i", "?": single characters, except Chinese, Japanese and Korean ones, which are real words.
+  if([...raw].length === 1 && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(raw)) return true;
+  if(/^(https?:\/\/|www\.)\S+$/i.test(raw)) return true;                    // links
+  if(/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(raw) && /[a-z]/i.test(raw)) return true; // example.com, discord.gg/abc, v1.2
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) return true;                   // e-mail addresses
+  const t = raw.replace(/\{[^{}]*\}/g, "").replace(/<[^<>]*>/g, "");
+  return !/\p{L}/u.test(t);                                                  // only numbers, symbols, placeholders
+}
+function skipInfo(g){
+  const marked = g.members.find(m => typeof m.skip === "boolean");
+  return marked ? { skip: marked.skip, manual: true } : { skip: autoSkip(g.source), manual: false };
+}
+const isSkipped = g => skipInfo(g).skip;
+let hideSkip = true;
+try{ hideSkip = localStorage.getItem("nlt.hideSkip") !== "0"; }catch(e){}
+const activeGroups = () => hideSkip ? S.groups.filter(g => !isSkipped(g)) : S.groups;
+function setGroupSkip(g, value){
+  const automatic = autoSkip(g.source);
+  g.members.forEach(m => { m.skip = value === automatic ? undefined : value; });
+}
+let skipTab = "skip";
+function renderSkipList(){
+  const q = ($("skipSearch").value || "").trim().toLowerCase();
+  const skippedAll = S.groups.filter(isSkipped), keepAll = S.groups.filter(g => !isSkipped(g));
+  $("skipTabs").querySelectorAll("button").forEach(b => {
+    b.setAttribute("aria-pressed", String(b.dataset.tab === skipTab));
+    b.querySelector(".n").textContent = fmt(b.dataset.tab === "skip" ? skippedAll.length : keepAll.length);
+  });
+  const list = (skipTab === "skip" ? skippedAll : keepAll)
+    .filter(g => !q || g.source.toLowerCase().includes(q)).sort((a, b) => a.first - b.first);
+  const empty = q ? "Nothing matches your search." : skipTab === "skip" ? "No texts are marked as not needing translation." : "All texts are marked as not needing translation.";
+  $("skipList").innerHTML = list.length ? list.slice(0, 1000).map(g => {
+    const info = skipInfo(g);
+    const note = skipTab === "skip" ? (info.manual ? "marked by you" : "automatic") : (g.members.length > 1 ? `used ${fmt(g.members.length)}×` : "");
+    const btn = skipTab === "skip" ? `<button class="btn subtle" data-act="unskip">Translate it</button>` : `<button class="btn subtle" data-act="skip">Don’t translate</button>`;
+    return `<div class="skip-item" data-g="${esc(rowId(g))}"><span class="txt" title="${esc(g.source)}">${esc(g.source.replace(/\s+/g, " "))}</span><small>${note}</small>${btn}</div>`;
+  }).join("") + (list.length > 1000 ? `<div class="skip-empty">…and ${fmt(list.length - 1000)} more. Use the search to find them.</div>` : "")
+    : `<div class="skip-empty">${empty}</div>`;
+}
+
 function cultureStats(c, groups){
-  groups = groups || S.groups;
+  groups = groups || activeGroups();
   let done=0, conflict=0;
   for(const g of groups){ const st = groupState(g,c); if(st.done) done++; if(st.conflict) conflict++; }
   return { done, conflict, total:groups.length, todo:groups.length-done };
@@ -2132,13 +2221,17 @@ function cultureStats(c, groups){
 function renderAll(){ renderSummary(); renderLangs(); renderFilters(); renderList(); }
 
 function renderSummary(){
-  const total = S.entries.filter(e => e.source.trim()).length, uniq = S.groups.length;
+  const base = activeGroups();
+  const total = base.reduce((n, g) => n + g.members.length, 0), uniq = base.length;
   $("saving").innerHTML = uniq < total
     ? `${fmt(uniq)} texts to translate`
     : `${fmt(uniq)} texts to translate`;
-  $("savingNote").textContent = uniq < total
-    ? `${fmt(total - uniq)} duplicates are filled in automatically.`
-    : "No duplicate texts in this project.";
+  const skipped = S.groups.filter(isSkipped).length;
+  $("savingNote").innerHTML = esc(uniq < total
+      ? `${fmt(total - uniq)} duplicates are filled in automatically.`
+      : "No duplicate texts in this project.") +
+    (skipped ? ` ${fmt(skipped)} ${skipped === 1 ? "text doesn’t" : "texts don’t"} need translating${hideSkip ? " and " + (skipped === 1 ? "is" : "are") + " hidden" : ""}.` : "") +
+    ` <button class="btn quiet" id="manageSkip">Manage</button>`;
   if(!S.culture){ $("progLang").textContent=""; $("progText").textContent=""; $("progBar").style.width="0"; return; }
   const st = cultureStats(S.culture);
   $("progLang").innerHTML = `<b>${esc(langName(S.culture))}</b>`;
@@ -2160,7 +2253,7 @@ function renderLangs(){
   }).join("") + (S.editLangs ? "" : `<button class="lang add" id="addLangBtn">Add language</button>`);
 }
 function renderFilters(){
-  const st = S.culture ? cultureStats(S.culture, S.groups.filter(groupInFolder)) : {todo:0,conflict:0,done:0,total:0};
+  const st = S.culture ? cultureStats(S.culture, activeGroups().filter(groupInFolder)) : {todo:0,conflict:0,done:0,total:0};
   const n = { todo:st.todo, conflict:st.conflict, done:st.done, all:st.total };
   $("filters").querySelectorAll("button").forEach(b => {
     b.setAttribute("aria-pressed", String(b.dataset.f===S.filter));
@@ -2176,6 +2269,7 @@ function visibleGroups(){
   else{
     list = list.filter(g => {
       if(!groupInFolder(g)) return false;
+      if(hideSkip && isSkipped(g)) return false;
       const st = groupState(g,c);
       if(S.filter==="todo" && st.done) return false;
       if(S.filter==="done" && !st.done) return false;
@@ -2233,14 +2327,18 @@ function rowHtml(g){
         (canUnlink ? `<button class="btn quiet" data-act="split" data-i="${m.i}">Translate separately</button>` : "") + `</li>`
       ).join("") + (n>500 ? `<li>…and ${fmt(n-500)} more</li>` : "") + `</ul></div>`;
   }
-  return `<article class="row ${st.done?"done":""} ${st.conflict?"conflict":""}" data-g="${esc(g.id)}">
+  const skipped = isSkipped(g);
+  const skipBtn = skipped
+    ? `<span class="skip-tag">Doesn’t need translating</span><button class="btn quiet" data-act="unskip">Translate it</button>`
+    : `<button class="btn quiet" data-act="skip" title="Leave this text out of the counts, for all languages">Don’t translate</button>`;
+  return `<article class="row ${st.done?"done":""} ${st.conflict?"conflict":""} ${skipped?"skipped":""}" data-g="${esc(rowId(g))}">
     <div class="src">
       <p class="src-text">${srcHtml(g.source)}</p>
       <div class="meta">${uses}${isSplit?'<span class="split-tag">Translated separately</span>':""}</div>
     </div>
     <div class="dst">
       <textarea class="tr" rows="1" lang="${esc(S.culture)}" dir="auto" spellcheck="true" aria-label="Translation for ${esc(g.source.slice(0,60))}">${esc(st.conflict?"":st.value)}</textarea>
-      <div class="dst-actions"><button class="btn quiet" data-act="copy">Same as source</button></div>
+      <div class="dst-actions"><button class="btn quiet" data-act="copy">Same as source</button>${skipBtn}</div>
       <div class="hints">${hintsHtml(g, st)}</div>
     </div>
     ${usesList}
@@ -2304,6 +2402,7 @@ function buildExport(){
     const o = { namespace:e.ns, key:e.key, source:e.source, location:e.location, folder:e.folder, translations:e.tr };
     if(e.outdated && Object.keys(e.outdated).length) o.outdated = e.outdated;
     if(e.split) o._split = true;
+    if(typeof e.skip === "boolean") o._skip = e.skip;
     return o;
   });
   return out;
@@ -2331,14 +2430,48 @@ async function exportJson(){
 }
 
 /* ---------- Excel spreadsheet ---------- */
+/* Folder choice for the Excel export. Checking a folder includes its subfolders (shown checked and greyed). */
+const SHEET_FOLDERS_KEY = "nlt.sheetFolders";
+let sheetFolderSel = null;   // explicitly checked folders, remembered between openings
+function allFolderPaths(){
+  const counts = new Map();
+  for(const e of S.entries){
+    if(!e.source.trim()) continue;
+    const parts = e.folder.split("/");
+    for(let i = 1; i <= parts.length; i++){ const k = parts.slice(0, i).join("/"); counts.set(k, (counts.get(k) || 0) + 1); }
+  }
+  return { paths: [...counts.keys()].sort((a, b) => a.localeCompare(b)), counts };
+}
+const parentOf = p => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : null;
+function ancestorChecked(p){ for(let a = parentOf(p); a; a = parentOf(a)) if(sheetFolderSel.has(a)) return true; return false; }
+const folderIncluded = p => sheetFolderSel.has(p) || ancestorChecked(p);
+function loadSheetFolderSel(){
+  if(sheetFolderSel) return;
+  try{ const saved = JSON.parse(localStorage.getItem(SHEET_FOLDERS_KEY) || "null"); if(Array.isArray(saved)) sheetFolderSel = new Set(saved); }catch(e){}
+  if(!sheetFolderSel){ const { paths } = allFolderPaths(); sheetFolderSel = new Set(paths.filter(p => !parentOf(p) || !paths.includes(parentOf(p)))); }
+}
+function saveSheetFolderSel(){ try{ localStorage.setItem(SHEET_FOLDERS_KEY, JSON.stringify([...sheetFolderSel])); }catch(e){} }
+function renderSheetFolders(){
+  const { paths, counts } = allFolderPaths();
+  $("sheetFolderTree").innerHTML = paths.map(p => {
+    const depth = p.split("/").length - 1, implied = ancestorChecked(p), checked = implied || sheetFolderSel.has(p);
+    return `<label class="check${implied ? " implied" : ""}" style="padding-left:${depth * 20}px"><input type="checkbox" data-folder="${esc(p)}"${checked ? " checked" : ""}${implied ? " disabled" : ""}> ${esc(p.split("/").pop())} <span class="count">(${fmt(counts.get(p))})</span></label>`;
+  }).join("");
+  const roots = paths.filter(p => !parentOf(p) || !paths.includes(parentOf(p)));
+  const allOn = roots.length > 0 && roots.every(r => sheetFolderSel.has(r));
+  const anyOn = paths.some(folderIncluded);
+  $("sheetFoldersToggle").checked = allOn;
+  $("sheetFoldersToggle").indeterminate = !allOn && anyOn;
+}
 function openSheetDialog(){
+  loadSheetFolderSel();
+  $("sheetAllFolders").checked = true;
+  $("sheetFolders").hidden = true;
+  renderSheetFolders();
   $("sheetAll").checked = true;
   $("sheetLangs").innerHTML = S.cultures.map(c =>
     `<label class="check"><input type="checkbox" data-sheet-lang="${esc(c)}" checked> ${esc(langName(c))} (${esc(c)})</label>`).join("");
   $("sheetLangs").hidden = true;
-  $("sheetFolderWrap").hidden = !S.folder;
-  $("sheetFolderOnly").checked = false;
-  $("sheetFolderName").textContent = `Only texts in ${S.folder}`;
   $("sheetModal").hidden = false; $("sheetExport").focus();
 }
 const closeSheetDialog = () => { $("sheetModal").hidden = true; };
@@ -2347,8 +2480,9 @@ async function exportSheet(){
   const langs = $("sheetAll").checked ? S.cultures.slice()
     : [...document.querySelectorAll("[data-sheet-lang]")].filter(i => i.checked).map(i => i.dataset.sheetLang);
   const native = (S.root && S.root.nativeCulture) || "source";
-  const onlyFolder = S.folder && $("sheetFolderOnly").checked;
-  const groups = S.groups.filter(g => !onlyFolder || groupInFolder(g)).sort((a,b) => a.first - b.first);
+  const allFolders = $("sheetAllFolders").checked;
+  const groups = S.groups.filter(g => !(hideSkip && isSkipped(g))).filter(g => allFolders || g.members.some(m => folderIncluded(m.folder))).sort((a,b) => a.first - b.first);
+  if(!allFolders && !groups.length){ toast("Select at least one folder with texts, or tick All folders."); return; }
   const note = "(do not change column, used as IDs)";
   const rows = [[`${native} ${note}`, ...langs]];
   // One row per source text. A text translated separately somewhere uses the main translation here.
@@ -2522,6 +2656,27 @@ $("openBtn").onclick = $("openBtn2").onclick = () => $("fileInput").click();
 $("fileInput").onchange = e => { readFile(e.target.files[0]); e.target.value=""; };
 $("exportBtn").onclick = exportJson;
 $("undoBtn").onclick = undo;
+$("hideSkip").checked = hideSkip;
+$("hideSkip").onchange = e => {
+  hideSkip = e.target.checked;
+  try{ localStorage.setItem("nlt.hideSkip", hideSkip ? "1" : "0"); }catch(err){}
+  S.stableOrder = null; S.limit = 60; renderAll();
+};
+const closeSkipModal = () => { $("skipModal").hidden = true; };
+$("savingNote").addEventListener("click", e => { if(e.target.closest("#manageSkip")){ skipTab = "skip"; $("skipSearch").value = ""; renderSkipList(); $("skipModal").hidden = false; $("skipX").focus(); } });
+$("skipX").onclick = closeSkipModal;
+$("skipModal").addEventListener("mousedown", e => { if(e.target === $("skipModal")) closeSkipModal(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("skipModal").hidden) closeSkipModal(); });
+$("skipList").addEventListener("click", e => {
+  const b = e.target.closest("[data-act=unskip], [data-act=skip]"); if(!b) return;
+  const g = groupOf(b.closest(".skip-item")); if(!g) return;
+  const skip = b.dataset.act === "skip";
+  pushUndo(skip ? `Don’t translate “${shortText(g.source)}”` : `Translate “${shortText(g.source)}”`);
+  setGroupSkip(g, skip); S.stableOrder = null;
+  renderAll(); renderSkipList(); saveSession();
+});
+$("skipTabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if(!b) return; skipTab = b.dataset.tab; renderSkipList(); });
+$("skipSearch").addEventListener("input", () => renderSkipList());
 /* Dark / light toggle */
 const SUN = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const MOON = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
@@ -2567,6 +2722,17 @@ $("sheetExport").onclick = exportSheet;
 $("sheetImport").onclick = () => $("sheetInput").click();
 $("sheetInput").onchange = e => { importSheet(e.target.files[0]); e.target.value = ""; };
 $("sheetAll").onchange = e => { $("sheetLangs").hidden = e.target.checked; };
+$("sheetAllFolders").onchange = e => { $("sheetFolders").hidden = e.target.checked; renderSheetFolders(); };
+$("sheetFolderTree").addEventListener("change", e => {
+  const box = e.target.closest("[data-folder]"); if(!box) return;
+  if(box.checked) sheetFolderSel.add(box.dataset.folder); else sheetFolderSel.delete(box.dataset.folder);
+  saveSheetFolderSel(); renderSheetFolders();
+});
+$("sheetFoldersToggle").onchange = e => {
+  const { paths } = allFolderPaths();
+  sheetFolderSel = e.target.checked ? new Set(paths.filter(p => !parentOf(p) || !paths.includes(parentOf(p)))) : new Set();
+  saveSheetFolderSel(); renderSheetFolders();
+};
 $("sheetModal").onclick = e => { if(e.target === $("sheetModal")) closeSheetDialog(); };
 document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("sheetModal").hidden) closeSheetDialog(); });
 ["dragenter","dragover"].forEach(t => window.addEventListener(t, e => { e.preventDefault(); $("drop").classList.add("over"); }));
@@ -2663,7 +2829,7 @@ let qTimer; $("search").addEventListener("input", e => { clearTimeout(qTimer); q
 const list = $("list");
 list.addEventListener("input", e => {
   const t = e.target; if(!t.classList.contains("tr")) return;
-  const row = t.closest(".row"); const g = S.gmap.get(row.dataset.g); if(!g) return;
+  const row = t.closest(".row"); const g = groupOf(row); if(!g) return;
   pushUndo(`Edited “${shortText(g.source)}”`, "type:" + g.id + ":" + S.culture);
   setGroupValue(g, S.culture, t.value); autosize(t); refreshRow(row, g); refreshCounts(); saveSession();
 });
@@ -2678,8 +2844,16 @@ list.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if(!b) return;
   const act = b.dataset.act;
   if(act==="more"){ S.limit += 100; renderList(); return; }
-  const row = b.closest(".row"); const g = row && S.gmap.get(row.dataset.g);
+  const row = b.closest(".row"); const g = row && groupOf(row);
   if(act==="toggle" && g){ S.open.has(g.id) ? S.open.delete(g.id) : S.open.add(g.id); renderList(); return; }
+  if((act==="skip" || act==="unskip") && g){
+    pushUndo(act==="skip" ? `Don’t translate “${shortText(g.source)}”` : `Translate “${shortText(g.source)}”`);
+    setGroupSkip(g, act==="skip");
+    if(act==="skip" && hideSkip && S.stableOrder) S.stableOrder = S.stableOrder.filter(id => id !== g.id);
+    renderAll(); saveSession();
+    if(act==="skip") toast(hideSkip ? "Hidden. Find it again under Manage, next to the text count." : "Marked as not needing translation.");
+    return;
+  }
   if((act==="pick" || act==="copy") && g){
     const v = act==="copy" ? g.source : b.dataset.v;
     pushUndo(`Changed “${shortText(g.source)}”`);
