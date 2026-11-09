@@ -67,6 +67,12 @@ header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 
 /* Empty state */
 .bar-links{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:6px;padding-top:8px}
+.promo{margin-right:auto;display:inline-flex;align-items:center;gap:8px;padding:2px 4px 2px 10px;border-radius:999px;background:var(--accent-soft);color:var(--ink);text-decoration:none;font-size:.85rem;line-height:1.6;border:1px solid transparent;transition:border-color .15s}
+.promo svg{color:var(--accent);flex:none}
+.promo b{font-weight:700}
+.promo-cta{background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:0 10px;font-weight:700;white-space:nowrap}
+.promo:hover{border-color:var(--accent)}
+.promo:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .bar-links .btn.subtle{font-size:.85rem}
 .theme-btn{display:inline-flex;align-items:center;gap:6px}
 .theme-btn svg{flex:none}
@@ -229,6 +235,9 @@ textarea.tr:focus{border-color:var(--accent)}
 .addlang{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-width:720px}
 .addlang input{flex:1 1 240px;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 12px}
 .addlang p{flex-basis:100%;margin:0;color:var(--ink-2);font-size:.9rem}
+.to-top{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:15;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .2s,transform .2s,background .15s}
+.to-top.show{opacity:1;transform:none;pointer-events:auto}
+.to-top:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;max-width:min(92vw,560px);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
 .keys{color:var(--ink-2);font-size:.85rem;margin-left:auto}
@@ -240,6 +249,11 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
 <body>
 <header class="bar">
   <nav class="wrap bar-links" aria-label="Links">
+    <a class="promo" href="https://www.fab.com/listings/4ef6bbf3-560e-419f-8693-70cad4a43fd5" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      <span>Works great with <b>Nice Settings Menu</b></span>
+      <span class="promo-cta">View on FAB →</span>
+    </a>
     <a class="btn subtle" id="docsBtn" href="#" target="_blank" rel="noopener">Documentation</a>
     <a class="btn subtle" href="https://discord.com/invite/cecaphy" target="_blank" rel="noopener">Discord Support</a>
     <a class="btn subtle" href="https://www.fab.com/sellers/NiceShadow" target="_blank" rel="noopener">Check out NiceShadow on FAB</a>
@@ -326,6 +340,7 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
     <div class="list" id="list"></div>
   </section>
 </main>
+<button class="to-top" id="toTop" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="modal" id="skipModal" hidden role="dialog" aria-modal="true" aria-labelledby="skipTitle">
   <div class="modal-box wide skip-box">
@@ -1918,7 +1933,7 @@ const PAGE_SNAPSHOT = (() => {
     root.removeAttribute("data-theme");
     const head = root.querySelector("head"), body = root.querySelector("body");
     [...head.children].forEach(el => { if(!(el.tagName === "META" || el.tagName === "TITLE" || el.id === "nlh-style" || el.id === "nlh-theme")) el.remove(); });
-    const keep = new Set(["nlh-xlsx","nlh-app","toast","sheetModal","modal"]);
+    const keep = new Set(["nlh-xlsx","nlh-app","toast","sheetModal","modal","addModal","openModal","skipModal","toTop"]);
     [...body.children].forEach(el => {
       const ours = el.matches("header.bar, main.wrap") || keep.has(el.id);
       if(!ours) el.remove();
@@ -2667,6 +2682,16 @@ $("openBtn").onclick = $("openBtn2").onclick = () => $("fileInput").click();
 $("fileInput").onchange = e => { readFile(e.target.files[0]); e.target.value=""; };
 $("exportBtn").onclick = exportJson;
 $("undoBtn").onclick = undo;
+/* Back-to-top bubble: appears after scrolling down a bit. */
+const toTop = $("toTop");
+const updateToTop = () => toTop.classList.toggle("show", window.scrollY > 500);
+window.addEventListener("scroll", updateToTop, { passive: true });
+updateToTop();
+toTop.onclick = () => {
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  toTop.blur();
+};
 $("hideSkip").checked = hideSkip;
 $("hideSkip").onchange = e => {
   hideSkip = e.target.checked;
