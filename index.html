@@ -2168,8 +2168,19 @@ function propagateExisting(){
 }
 /* Texts that don't need translating: automatic (no letters once placeholders and tags are removed)
    or marked by hand. A hand-made choice always wins over the automatic one. */
+/* Brand and technical names that stay the same in every language, when they are the whole text
+   (in a longer text they are translated as part of it). Not case-sensitive. */
+const NO_TRANSLATE_NAMES = new Set([
+  "vsync", "v-sync", "url", "ui",
+  "nvidia dlss frame generation", "nvidia dlss",
+  "intel xess", "intel xell 2", "intel xefg",
+  "fxaa", "fg",
+  "amd fsr frame generation", "amd fsr", "amd anti lag 2", "amd redstone"
+]);
 function autoSkip(text){
   const raw = String(text).trim();
+  if(NO_TRANSLATE_NAMES.has(raw.replace(/\s+/g, " ").toLowerCase())) return true;   // "NVIDIA DLSS", "vsync"
+  if(raw.length > 1 && raw.startsWith("[") && raw.endsWith("]")) return true;        // "[user desktop resolution]"
   // "x", "X", "i", "?": single characters, except Chinese, Japanese and Korean ones, which are real words.
   if([...raw].length === 1 && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(raw)) return true;
   if(/^(https?:\/\/|www\.)\S+$/i.test(raw)) return true;                    // links
