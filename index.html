@@ -320,7 +320,6 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
     <div class="resume" id="resume" hidden>
       <span id="resumeText"></span>
       <button class="btn" id="resumeBtn">Continue where you left off</button>
-      <button class="btn quiet" id="forgetBtn">Discard</button>
     </div>
     <ol class="steps">
       <li><strong>Export from Unreal</strong>Open Window › Nice Localization Toolkit and click Export translations.</li>
@@ -923,7 +922,6 @@ function checkSession(){
     $("resumeText").textContent = `${d.fileName}, last edited ${new Date(d.savedAt).toLocaleString()}`;
     $("resume").hidden = false;
     $("resumeBtn").onclick = () => { S.culture = d.culture; loadJson(d.json, d.fileName, true); renderUndo(); };
-    $("forgetBtn").onclick = () => { try{localStorage.removeItem(STORE_KEY);}catch(e){} $("resume").hidden = true; };
   }catch(e){}
 }
 
