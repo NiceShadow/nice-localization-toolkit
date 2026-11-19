@@ -779,13 +779,13 @@ function renderLangs(){
   el.classList.toggle("editing", S.editLangs);
   $("editLangsBtn").textContent = S.editLangs ? "Done" : "Reorder or remove languages";
   $("editLangsBtn").setAttribute("aria-pressed", String(S.editLangs));
-  $("editLangsBtn").hidden = !S.cultures.length;
+  $("editLangsBtn").hidden = !S.root;
   el.innerHTML = S.cultures.map(c => {
     const st = cultureStats(c); const pct = st.total ? Math.round(st.done/st.total*100) : 0;
     const complete = st.total > 0 && st.done === st.total;
     const x = S.editLangs ? `<span class="x" data-remove="${esc(c)}" role="button" tabindex="0" aria-label="Remove ${esc(langName(c))}">×</span>` : "";
     return `<button class="lang${complete?" complete":""}" data-c="${esc(c)}"${complete?' title="Fully translated"':""} aria-pressed="${c===S.culture}"><span class="code">${esc(c)}</span>${esc(langName(c))}<span>${pct}%</span>${x}</button>`;
-  }).join("") + (S.editLangs ? "" : `<button class="lang add" id="addLangBtn">Add language</button>`);
+  }).join("") + `<button class="lang add" id="addLangBtn">Add language</button>`;
 }
 function renderFilters(){
   const st = S.culture ? cultureStats(S.culture, activeGroups().filter(groupInFolder)) : {todo:0,conflict:0,done:0,total:0};
