@@ -198,6 +198,24 @@ select.folder{max-width:260px}
 .folder-all{font-size:.9rem}
 .sheet-langs .check{margin:4px 0}
 .sheet-note{font-size:.9rem}
+.sheet-note a{color:var(--accent);font-weight:700}
+.nsm-box{max-width:620px;max-height:calc(100vh - 40px);display:flex;flex-direction:column}
+.nsm-box .sheet-note{margin-bottom:12px}
+.nsm-format{display:flex;flex-wrap:wrap;gap:4px 18px;margin:0 0 6px;border:0;padding:0}
+.nsm-format legend{font-weight:700;font-size:.9rem;margin-bottom:2px;padding:0}
+.nsm-format .check{margin:4px 0}
+.nsm-list{list-style:none;margin:4px 0 16px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--bg);overflow-y:auto;min-height:60px}
+.nsm-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 4px;border-bottom:1px solid var(--line);background:var(--bg)}
+.nsm-item:last-child{border-bottom:0}
+.nsm-item.dragging{opacity:.45}
+.nsm-item .check{margin:0;flex:1;min-width:0}
+.nsm-item .nsm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nsm-item .nsm-src{font-size:.8rem;color:var(--ink-2);white-space:nowrap}
+.nsm-item .code{font-family:var(--mono);font-size:.76rem;line-height:1.5;color:var(--ink);background:var(--surface-2);border-radius:999px;padding:0 7px;white-space:nowrap}
+.grip{display:grid;place-items:center;width:28px;height:30px;border:0;border-radius:6px;background:transparent;color:var(--ink-2);cursor:grab;touch-action:none;flex:none}
+.grip:hover,.grip:focus-visible{background:var(--surface-2);color:var(--ink)}
+.nsm-actions{flex-wrap:wrap}
+.key-field{margin:0 0 18px}
 .modal-actions.split{justify-content:space-between;flex-wrap:wrap;margin-top:18px}
 .modal-actions.split div{display:flex;gap:8px}
 .tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:16px 0;border-bottom:1px solid var(--line)}
@@ -287,6 +305,7 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
       <button class="btn" id="openBtn">Open JSON</button>
       <button class="btn primary" id="exportBtn" hidden>Download JSON</button>
       <button class="btn" id="sheetBtn" hidden>Download/Import Excel file</button>
+      <button class="btn" id="nsmBtn" hidden>Nice Settings Menu Option Switcher</button>
       <span class="undo-area" id="undoArea" hidden>
       <span class="keys undo-hint">You can use Ctrl+Z and Ctrl+Y</span>
       <button class="btn icon" id="undoBtn" disabled title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 14 4 9l5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -420,6 +439,36 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
     <input type="file" id="sheetInput" accept=".xlsx,.csv" hidden>
   </div>
 </div>
+<div class="modal" id="nsmModal" hidden role="dialog" aria-modal="true" aria-labelledby="nsmTitle">
+  <div class="modal-box wide nsm-box">
+    <button class="modal-x" id="nsmX" aria-label="Close">×</button>
+    <h2 id="nsmTitle">Nice Settings Menu Option Switcher</h2>
+    <p class="sheet-note">Fill the <b>Language</b> Option Switcher of the Nice Settings Menu in seconds. Copy the option names and paste them into its <b>Option Names</b> array (right-click the array › Paste). Then copy the commands and paste them into <b>Commands to execute for each option index</b>. Both use the order below. This is also described in the <a href="https://niceshadow.gitbook.io/nice-settings-menu-v2/getting-started/localization-languages" target="_blank" rel="noopener">Nice Settings Menu documentation</a>.</p>
+    <fieldset class="nsm-format">
+      <legend>Language names</legend>
+      <label class="check"><input type="radio" name="nsmFormat" value="native" checked> In their own language <span class="nsm-src">(Deutsch)</span></label>
+      <label class="check"><input type="radio" name="nsmFormat" value="both"> Both <span class="nsm-src">(Deutsch (German))</span></label>
+      <label class="check"><input type="radio" name="nsmFormat" value="english"> English <span class="nsm-src">(German)</span></label>
+    </fieldset>
+    <label class="check"><input type="checkbox" id="nsmAll"> Select all languages</label>
+    <ol class="nsm-list" id="nsmList" aria-label="Languages, drag the handles to reorder"></ol>
+    <div class="modal-actions split nsm-actions">
+      <button class="btn primary" id="nsmCopyNames">Copy option names</button>
+      <button class="btn" id="nsmCopyCmds">Copy commands</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="nsmKeyModal" hidden role="dialog" aria-modal="true" aria-labelledby="nsmKeyTitle">
+  <div class="modal-box wide">
+    <h2 id="nsmKeyTitle">Nice Settings Menu spreadsheet</h2>
+    <p class="sheet-note">This spreadsheet is for the Nice Settings Menu and includes the title of the Language Option Switcher (“Language”). To import its translations, copy the localization key of the Language Option Switcher Title text in Unreal and paste it here. <a href="https://niceshadow.gitbook.io/nice-settings-menu-v2/getting-started/localization-languages" target="_blank" rel="noopener">How to find the key</a></p>
+    <div class="key-field"><input id="nsmKeyInput" class="add-input" placeholder="Localization key, for example 2F0D12914F6E547533C7E9A089D1064D" aria-label="Localization key of the Language title" autocomplete="off" spellcheck="false"></div>
+    <div class="modal-actions">
+      <button class="btn" id="nsmKeyCancel">Cancel</button>
+      <button class="btn primary" id="nsmKeyOk">Import</button>
+    </div>
+  </div>
+</div>
 <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
   <div class="modal-box">
     <h2 id="modalTitle"></h2>
@@ -442,7 +491,7 @@ const PAGE_SNAPSHOT = (() => {
     root.removeAttribute("data-theme");
     const head = root.querySelector("head"), body = root.querySelector("body");
     [...head.children].forEach(el => { if(!(el.tagName === "META" || el.tagName === "TITLE" || el.id === "nlh-style" || el.id === "nlh-theme")) el.remove(); });
-    const keep = new Set(["nlh-app","toast","sheetModal","modal","addModal","openModal","skipModal","toTop"]);
+    const keep = new Set(["nlh-app","toast","sheetModal","nsmModal","nsmKeyModal","modal","addModal","openModal","skipModal","toTop"]);
     [...body.children].forEach(el => {
       const ours = el.matches("header.bar, main.wrap") || keep.has(el.id);
       if(!ours) el.remove();
@@ -485,7 +534,7 @@ function loadJson(json, fileName, fromSession){
   S.culture = S.cultures.includes(S.culture) ? S.culture : (S.cultures[0] || null);
   buildGroups();
   const filled = fromSession ? 0 : propagateExisting();
-  $("intro").hidden = true; $("work").hidden = false; $("exportBtn").hidden = false; $("sheetBtn").hidden = false;
+  $("intro").hidden = true; $("work").hidden = false; $("exportBtn").hidden = false; $("sheetBtn").hidden = false; $("nsmBtn").hidden = false;
   $("fileName").textContent = fileName;
   $("fileChip").title = fileName;
   $("fileChip").hidden = false;
@@ -1268,6 +1317,15 @@ async function importSheet(file){
   });
   if(!langCols.length){ toast("No language columns found. The first row should hold language codes like de or fr."); return; }
 
+  // Nice Settings Menu spreadsheet with the "Language" title row: ask for the key of that title first.
+  const normCell = t => String(t == null ? "" : t).replace(/\r\n?/g, "\n").trim();
+  const langRow = isNsmSheet(rows) ? rows.slice(1).find(r => normCell(r[0]) === "Language") : null;
+  let nsmKey = null;
+  if(langRow){
+    nsmKey = await askNsmKey();
+    if(!nsmKey){ toast("Import cancelled. Nothing was changed."); return; }
+  }
+
   pushUndo("Imported Excel file");
   const added = [];
   for(const [, code] of langCols){
@@ -1284,6 +1342,7 @@ async function importSheet(file){
   const tagged = new Map();
   for(const [id, t] of splitTags()) tagged.set(norm(t), S.gmap.get(id));
   for(const row of rows.slice(1)){
+    if(row === langRow) continue;   // goes only to the text with the key entered above
     const id = idCol >= 0 ? String(row[idCol] || "").trim() : "";   // older files had an ID column
     const src = String(row[0] || "");
     // Spreadsheet programs store line breaks as \n, Unreal often as \r\n: compare without that difference.
@@ -1302,11 +1361,194 @@ async function importSheet(file){
       }
     }
   }
-  S.stableOrder = null; renderAll(); saveSession(); closeSheetDialog();
-  let msg = `Imported ${fmt(updated)} translations.`;
+  let titleMsg = "";
+  if(langRow){
+    const r = applyNsmTitle(langRow, nsmKey, colCode);
+    updated += r.updated;
+    titleMsg = r.created ? ` Added the Language title (key ${nsmKey.key}).` : ` Updated the Language title (key ${nsmKey.key}).`;
+  }
+  S.stableOrder = null; renderFolders(); renderAll(); saveSession(); closeSheetDialog();
+  let msg = `Imported ${fmt(updated)} translations.` + titleMsg;
   if(added.length) msg += ` Added ${added.join(", ")}.`;
   if(unmatched) msg += ` ${fmt(unmatched)} rows didn’t match any text (changed or removed source).`;
   toast(msg);
+}
+
+
+/* ---------- Nice Settings Menu: Language Option Switcher ---------- */
+const NSM_DOCS = "https://niceshadow.gitbook.io/nice-settings-menu-v2/getting-started/localization-languages";
+/* Language names in their own language, as games show them. Anything not listed comes from the browser. */
+const NATIVE_NAMES = {
+  "en":"English","en-us":"English (US)","en-gb":"English (UK)","de":"Deutsch","de-at":"Deutsch (Österreich)","de-ch":"Deutsch (Schweiz)",
+  "fr":"Français","fr-ca":"Français (Canada)","es":"Español","es-es":"Español (España)","es-419":"Español (Latinoamérica)","es-mx":"Español (México)",
+  "it":"Italiano","pt":"Português","pt-pt":"Português (Portugal)","pt-br":"Português (Brasil)","ru":"Русский","pl":"Polski","tr":"Türkçe",
+  "nl":"Nederlands","sv":"Svenska","da":"Dansk","fi":"Suomi","nb":"Norsk bokmål","no":"Norsk","cs":"Čeština","sk":"Slovenčina","hu":"Magyar",
+  "ro":"Română","bg":"Български","uk":"Українська","el":"Ελληνικά","hr":"Hrvatski","sr":"Српски","sl":"Slovenščina","lt":"Lietuvių","lv":"Latviešu",
+  "et":"Eesti","ar":"العربية","he":"עברית","fa":"فارسی","hi":"हिन्दी","th":"ไทย","vi":"Tiếng Việt","id":"Bahasa Indonesia","ms":"Bahasa Melayu",
+  "ja":"日本語","ko":"한국어","zh":"中文","zh-hans":"简体中文","zh-hant":"繁體中文","zh-cn":"简体中文","zh-tw":"繁體中文","zh-hk":"繁體中文（香港）"
+};
+function nativeLangName(c){
+  const hit = NATIVE_NAMES[String(c).toLowerCase()]; if(hit) return hit;
+  try{
+    const n = new Intl.DisplayNames([c], {type:"language"}).of(c);
+    if(n && n.toLowerCase() !== String(c).toLowerCase()) return n.charAt(0).toLocaleUpperCase(c) + n.slice(1);
+  }catch(e){}
+  return langName(c);
+}
+function optionName(c, format){
+  const own = nativeLangName(c), en = langName(c);
+  if(format === "english") return en;
+  if(format === "both") return own.toLowerCase() === en.toLowerCase() ? own : `${own} (${en.replace(/\s*\(([^()]*)\)\s*$/, ", $1")})`;
+  return own;
+}
+let nsm = { order:[], off:[], format:"native" };
+try{ const v = JSON.parse(localStorage.getItem("nlt.nsm") || "null"); if(v && Array.isArray(v.order)) nsm = Object.assign(nsm, v); }catch(e){}
+const saveNsm = () => { try{ localStorage.setItem("nlt.nsm", JSON.stringify(nsm)); }catch(e){} };
+function nsmLangs(){
+  const native = S.root && S.root.nativeCulture ? String(S.root.nativeCulture) : "";
+  const all = (native ? [native] : []).concat(S.cultures.filter(c => c.toLowerCase() !== native.toLowerCase()));
+  const has = c => all.some(x => x.toLowerCase() === c.toLowerCase());
+  const order = nsm.order.filter(has).map(c => all.find(x => x.toLowerCase() === c.toLowerCase()));
+  all.forEach(c => { if(!order.includes(c)) order.push(c); });
+  return order;
+}
+function renderNsmList(){
+  const order = nsmLangs(), off = new Set(nsm.off), native = String((S.root && S.root.nativeCulture) || "").toLowerCase();
+  $("nsmList").innerHTML = order.map(c =>
+    `<li class="nsm-item" data-c="${esc(c)}">` +
+    `<button class="grip" type="button" aria-label="Move ${esc(langName(c))}, use the arrow keys or drag"><svg viewBox="0 0 12 18" width="12" height="18" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/></g></svg></button>` +
+    `<label class="check"><input type="checkbox" data-nsm-c="${esc(c)}"${off.has(c) ? "" : " checked"}> <span class="nsm-name">${esc(optionName(c, nsm.format))}</span>` +
+    (c.toLowerCase() === native ? ` <span class="nsm-src">source language</span>` : "") + `</label>` +
+    `<span class="code">${esc(c)}</span></li>`).join("");
+  const on = order.filter(c => !off.has(c)).length;
+  $("nsmAll").checked = on === order.length && on > 0;
+  $("nsmAll").indeterminate = on > 0 && on < order.length;
+}
+function openNsmDialog(){
+  document.querySelectorAll('input[name="nsmFormat"]').forEach(r => { r.checked = r.value === nsm.format; });
+  renderNsmList();
+  $("nsmModal").hidden = false; $("nsmCopyNames").focus();
+}
+const closeNsmDialog = () => { $("nsmModal").hidden = true; };
+const nsmSelected = () => { const off = new Set(nsm.off); return nsmLangs().filter(c => !off.has(c)); };
+const unrealString = t => '"' + String(t).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(e){
+    const ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", "");
+    ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand("copy"); }catch(err){}
+    ta.remove(); return ok;
+  }
+}
+async function nsmCopy(kind){
+  const langs = nsmSelected();
+  if(!langs.length){ toast("Select at least one language first."); return; }
+  const text = kind === "names"
+    ? "(" + langs.map(c => `INVTEXT(${unrealString(optionName(c, nsm.format))})`).join(",") + ")"
+    : "(" + langs.map(c => unrealString("culture=" + c)).join(",") + ")";
+  if(!(await copyText(text))){ toast("Copying didn’t work in this browser. Try again, or use another browser."); return; }
+  toast(kind === "names"
+    ? `Option names for ${fmt(langs.length)} languages copied to the clipboard. Paste them into Option Names of the Language Option Switcher.`
+    : `Commands for ${fmt(langs.length)} languages copied to the clipboard. Paste them into Commands to execute for each option index.`);
+}
+$("nsmBtn").onclick = openNsmDialog;
+$("nsmX").onclick = closeNsmDialog;
+$("nsmModal").addEventListener("mousedown", e => { if(e.target === $("nsmModal")) closeNsmDialog(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("nsmModal").hidden && $("nsmKeyModal").hidden) closeNsmDialog(); });
+$("nsmCopyNames").onclick = () => nsmCopy("names");
+$("nsmCopyCmds").onclick = () => nsmCopy("commands");
+document.querySelectorAll('input[name="nsmFormat"]').forEach(r => r.onchange = () => { nsm.format = r.value; saveNsm(); renderNsmList(); });
+$("nsmAll").onchange = e => { nsm.off = e.target.checked ? [] : nsmLangs(); saveNsm(); renderNsmList(); };
+$("nsmList").addEventListener("change", e => {
+  const c = e.target.dataset && e.target.dataset.nsmC; if(!c) return;
+  nsm.off = nsm.off.filter(x => x !== c); if(!e.target.checked) nsm.off.push(c);
+  saveNsm(); renderNsmList();
+});
+const nsmOrderFromDom = () => { nsm.order = [...$("nsmList").querySelectorAll(".nsm-item")].map(li => li.dataset.c); saveNsm(); };
+/* Reorder with the arrow keys on a handle */
+$("nsmList").addEventListener("keydown", e => {
+  const grip = e.target.closest(".grip"); if(!grip || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+  e.preventDefault();
+  const li = grip.closest(".nsm-item"), other = e.key === "ArrowUp" ? li.previousElementSibling : li.nextElementSibling;
+  if(!other) return;
+  li.parentNode.insertBefore(li, e.key === "ArrowUp" ? other : other.nextSibling);
+  nsmOrderFromDom(); grip.focus();
+});
+/* Reorder by dragging a handle (mouse and touch) */
+let nsmDrag = null;
+$("nsmList").addEventListener("pointerdown", e => {
+  const grip = e.target.closest(".grip"); if(!grip) return;
+  e.preventDefault();
+  nsmDrag = { li: grip.closest(".nsm-item") }; nsmDrag.li.classList.add("dragging");
+});
+document.addEventListener("pointermove", e => {
+  if(!nsmDrag) return;
+  e.preventDefault();
+  const over = document.elementFromPoint(e.clientX, e.clientY);
+  const target = over && over.closest("#nsmList .nsm-item");
+  if(!target || target === nsmDrag.li) return;
+  const r = target.getBoundingClientRect();
+  target.parentNode.insertBefore(nsmDrag.li, e.clientY > r.top + r.height / 2 ? target.nextSibling : target);
+}, {passive:false});
+document.addEventListener("pointerup", () => {
+  if(!nsmDrag) return;
+  nsmDrag.li.classList.remove("dragging"); nsmDrag = null; nsmOrderFromDom();
+});
+
+/* A spreadsheet for the Nice Settings Menu: several of its typical texts are in the first column. */
+const NSM_SIGNS = ["Restore Defaults\n{section}", "Are you sure you want to apply all changes in the {section name} section?",
+  "Found unapplied changes in the following section:", "Automatically reverts in [Seconds]", "Upscaling and Frame Generation",
+  "Hold Reset Selected", "Color Blindness Intensity", "Resolution locked in Windowed Fullscreen mode."];
+function isNsmSheet(rows){
+  const have = new Set(rows.slice(1).map(r => String(r[0] == null ? "" : r[0]).replace(/\r\n?/g, "\n").trim()));
+  return NSM_SIGNS.filter(t => have.has(t)).length >= 3;
+}
+/* Key as typed, or the whole text copied in Unreal: NSLOCTEXT("Namespace", "Key", "Language") */
+function parseLocKey(raw){
+  const t = String(raw || "").trim(); if(!t) return null;
+  const m = t.match(/^(?:NSLOCTEXT|LOCTEXT)?\s*\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"/i);
+  if(m) return { ns: m[1], key: m[2] };
+  const key = t.replace(/^"+|"+$/g, "").trim();
+  return key ? { ns: null, key } : null;
+}
+function askNsmKey(){
+  return new Promise(resolve => {
+    const input = $("nsmKeyInput");
+    try{ input.value = localStorage.getItem("nlt.nsmKey") || ""; }catch(e){ input.value = ""; }
+    $("nsmKeyModal").hidden = false; input.focus(); input.select();
+    const done = v => { $("nsmKeyModal").hidden = true; $("nsmKeyOk").onclick = $("nsmKeyCancel").onclick = null; input.onkeydown = null; document.removeEventListener("keydown", onEsc, true); resolve(v); };
+    const ok = () => {
+      const k = parseLocKey(input.value);
+      if(!k){ toast("Enter the localization key of the Language title first."); input.focus(); return; }
+      try{ localStorage.setItem("nlt.nsmKey", input.value.trim()); }catch(e){}
+      done(k);
+    };
+    const onEsc = e => { if(e.key === "Escape" && !$("nsmKeyModal").hidden){ e.stopPropagation(); done(null); } };
+    document.addEventListener("keydown", onEsc, true);
+    $("nsmKeyOk").onclick = ok; $("nsmKeyCancel").onclick = () => done(null);
+    input.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); ok(); } };
+  });
+}
+/* Put the "Language" row into the text with that key; add the text if the file doesn't have it yet. */
+function applyNsmTitle(row, k, colCode){
+  let ent = S.entries.find(e => e.key === k.key && (k.ns == null || e.ns === k.ns)) || S.entries.find(e => e.key === k.key);
+  let created = false;
+  if(!ent){
+    ent = { i:S.entries.length, ns:k.ns || "", key:k.key, source:"Language", location:"/Game/NiceSettingsMenu/UI/Language Option Switcher",
+      folder:"Content/NiceSettingsMenu/UI", tr:{}, outdated:{}, split:false, skip:undefined };
+    S.cultures.forEach(c => { ent.tr[c] = ""; });
+    S.entries.push(ent); created = true;
+  } else if(S.entries.some(e => e !== ent && e.source === ent.source)){
+    ent.split = true;   // other texts with the same words keep their own translation
+  }
+  let updated = 0;
+  for(const [i, c] of colCode){
+    const v = row[i] == null ? "" : String(row[i]);
+    if(v.trim() && ent.tr[c] !== v){ ent.tr[c] = v; updated++; }
+  }
+  buildGroups();
+  return { created, updated };
 }
 
 /* ---------- Events ---------- */
@@ -1371,7 +1613,7 @@ document.addEventListener("keydown", e => {
   if(!(e.ctrlKey || e.metaKey) || e.altKey) return;
   const key = e.key.toLowerCase();
   if(key !== "z" && key !== "y") return;
-  if(!$("openModal").hidden || !$("addModal").hidden || !$("sheetModal").hidden || !$("modal").hidden) return;
+  if(!$("openModal").hidden || !$("addModal").hidden || !$("sheetModal").hidden || !$("nsmModal").hidden || !$("nsmKeyModal").hidden || !$("modal").hidden) return;
   // Search boxes keep the browser's own undo; translation fields use the page's undo.
   const t = e.target;
   if(t && (t.tagName === "INPUT" || (t.tagName === "TEXTAREA" && !t.classList.contains("tr")))) return;
