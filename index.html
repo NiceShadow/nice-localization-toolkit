@@ -405,7 +405,7 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
   <div class="modal-box wide">
     <button class="modal-x" id="sheetX" aria-label="Close">×</button>
     <h2 id="sheetTitle">Excel file</h2>
-    <p class="sheet-note">Translate in Excel, Google Sheets or LibreOffice, then import the file here. Each unique text is one row. Don’t change the first column: it’s used to find the texts again. Empty cells change nothing, and languages that aren’t in the file stay as they are.</p>
+    <p class="sheet-note">Translate in Excel, Google Sheets or LibreOffice, then import the file here. Each unique text is one row. A use you translate separately gets its own row, with the asset name after the text, like Back ⟨WB_PauseMenu⟩. Don’t change the first column: it’s used to find the texts again. Empty cells change nothing, and languages that aren’t in the file stay as they are.</p>
     <label class="check"><input type="checkbox" id="sheetAll" checked> All languages</label>
     <div class="sheet-langs" id="sheetLangs" hidden></div>
     <label class="check"><input type="checkbox" id="sheetAllFolders" checked> All folders</label>
@@ -822,6 +822,20 @@ function visibleGroups(){
   return list;
 }
 function srcHtml(s){ return esc(s).replace(/\{[^{}]*\}|&lt;[^&]*?&gt;/g, m => `<span class="tok">${m}</span>`); }
+/* Tagged source text for every use that is translated separately: "Back ⟨WB_PauseMenu⟩".
+   Built from all texts (not only the exported folders), so export and import always agree.
+   Two separate uses of the same text in the same asset are numbered: ⟨WB_PauseMenu 2⟩. */
+function splitTags(){
+  const tags = new Map(), seen = new Map();
+  const splits = S.groups.filter(g => g.id.startsWith("e:")).sort((a, b) => a.first - b.first);
+  for(const g of splits){
+    const asset = assetName(g.members[0].location).replace(/[⟨⟩]/g, "");
+    const k = g.source + "\u0000" + asset, n = (seen.get(k) || 0) + 1;
+    seen.set(k, n);
+    tags.set(g.id, `${g.source} ⟨${asset}${n > 1 ? " " + n : ""}⟩`);
+  }
+  return tags;
+}
 function assetName(loc){
   if(!loc) return "Unknown";
   const p = loc.split(/[:]/)[0]; const last = p.split("/").pop() || p; return last.split(".")[0] || last;
@@ -856,7 +870,6 @@ function rowHtml(g){
     const canUnlink = n > 1;
     usesList = `<div class="uses-list">` +
       (canUnlink ? `<div class="uses-help">Same word, different meaning somewhere? Translate that use separately.${S.folder ? " Translating here changes every use, also outside this folder." : ""}</div>` : "") +
-      (isSplit ? `<div class="uses-help">This use is translated separately. <button class="btn quiet" data-act="join" data-i="${g.members[0].i}">Translate together with the others again</button></div>` : "") +
       `<ul>` + g.members.slice(0,500).map(m =>
         `<li><span class="asset">${esc(assetName(m.location))}</span><span class="path" title="${esc(m.location)}  key: ${esc(m.key)}">${esc(m.folder)}</span>` +
         (canUnlink ? `<button class="btn quiet" data-act="split" data-i="${m.i}">Translate separately</button>` : "") + `</li>`
@@ -869,7 +882,7 @@ function rowHtml(g){
   return `<article class="row ${st.done?"done":""} ${st.conflict?"conflict":""} ${skipped?"skipped":""}" data-g="${esc(rowId(g))}">
     <div class="src">
       <p class="src-text">${srcHtml(g.source)}</p>
-      <div class="meta">${uses}${isSplit?'<span class="split-tag">Translated separately</span>':""}</div>
+      <div class="meta">${uses}${isSplit?`<span class="split-tag">Translated separately</span><button class="btn quiet" data-act="join" data-i="${g.members[0].i}" title="Use the same translation as the other uses of this text again">Translate together again</button>`:""}</div>
     </div>
     <div class="dst">
       <textarea class="tr" rows="1" lang="${esc(S.culture)}" dir="auto" spellcheck="true" aria-label="Translation for ${esc(g.source.slice(0,60))}">${esc(st.conflict?"":st.value)}</textarea>
@@ -1018,12 +1031,23 @@ async function exportSheet(){
   if(!allFolders && !groups.length){ toast("Select at least one folder with texts, or tick All folders."); return; }
   const note = "(do not change column, used as IDs)";
   const rows = [[`${native} ${note}`, ...langs]];
-  // One row per source text. A text translated separately somewhere uses the main translation here.
-  const rowOf = new Map();
+  // One row per source text. Each use that is translated separately gets its own row right below,
+  // with the asset name in brackets after the text, e.g. "Back ⟨WB_PauseMenu⟩".
+  const tags = splitTags();
+  const order = [], mainRow = new Map(), extra = new Map();
   for(const g of groups){
-    const row = [g.source, ...langs.map(c => groupState(g, c).value || "")];
-    if(rowOf.has(g.source)){ if(g.id.startsWith("s:")) rows[rowOf.get(g.source)] = row; continue; }
-    rowOf.set(g.source, rows.length); rows.push(row);
+    const row = langs.map(c => groupState(g, c).value || "");
+    if(g.id.startsWith("e:")){
+      if(!extra.has(g.source)){ extra.set(g.source, []); if(!mainRow.has(g.source)) order.push(g.source); }
+      extra.get(g.source).push([tags.get(g.id), ...row]);
+    } else {
+      if(!mainRow.has(g.source) && !extra.has(g.source)) order.push(g.source);
+      mainRow.set(g.source, [g.source, ...row]);
+    }
+  }
+  for(const src of order){
+    if(mainRow.has(src)) rows.push(mainRow.get(src));
+    (extra.get(src) || []).forEach(r => rows.push(r));
   }
   const buf = buildXlsx(rows, native, note, langs.length);
   const name = S.fileName.replace(/\.json$/i, "") + (langs.length && langs.length < S.cultures.length ? "_" + langs.join("_") : "") + ".xlsx";
@@ -1256,14 +1280,18 @@ async function importSheet(file){
   const colCode = new Map(langCols.map(([i, code]) => [i, S.cultures.find(c => c.toLowerCase() === code.toLowerCase())]));
 
   let updated = 0, unmatched = 0;
+  const norm = t => String(t).replace(/\r\n?/g, "\n");
+  const tagged = new Map();
+  for(const [id, t] of splitTags()) tagged.set(norm(t), S.gmap.get(id));
   for(const row of rows.slice(1)){
     const id = idCol >= 0 ? String(row[idCol] || "").trim() : "";   // older files had an ID column
     const src = String(row[0] || "");
     // Spreadsheet programs store line breaks as \n, Unreal often as \r\n: compare without that difference.
-    const norm = t => String(t).replace(/\r\n?/g, "\n");
     const same = S.groups.filter(g => norm(g.source) === norm(src));
     const main = (id && S.gmap.get(id)) || S.gmap.get("s:" + src) || same.find(g => g.id.startsWith("s:"));
-    const targets = main ? [main] : same;
+    // A row like "Back ⟨WB_PauseMenu⟩" belongs to the use of "Back" in WB_PauseMenu that is translated separately.
+    const sep = !main && !same.length ? tagged.get(norm(src)) : null;
+    const targets = main ? [main] : sep ? [sep] : same;
     if(!targets.length){ if(src.trim()) unmatched++; continue; }
     for(const [i, c] of colCode){
       const v = row[i] == null ? "" : String(row[i]);
