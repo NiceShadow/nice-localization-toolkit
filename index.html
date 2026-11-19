@@ -462,6 +462,7 @@ kbd{font-family:var(--mono);font-size:.8em;border:1px solid var(--line);border-b
   <div class="modal-box wide">
     <h2 id="nsmKeyTitle">Nice Settings Menu spreadsheet</h2>
     <p class="sheet-note">This spreadsheet is for the Nice Settings Menu and includes the title of the Language Option Switcher (“Language”). To import its translations, copy the localization key of the Language Option Switcher Title text in Unreal and paste it here. <a href="https://niceshadow.gitbook.io/nice-settings-menu-v2/getting-started/localization-languages" target="_blank" rel="noopener">How to find the key</a></p>
+    <p class="sheet-note" id="nsmKeySaved" hidden>The key you confirmed for this project is filled in. If the title has a different key now, paste the new one.</p>
     <div class="key-field"><input id="nsmKeyInput" class="add-input" placeholder="Localization key, for example 2F0D12914F6E547533C7E9A089D1064D" aria-label="Localization key of the Language title" autocomplete="off" spellcheck="false"></div>
     <div class="modal-actions">
       <button class="btn" id="nsmKeyCancel">Cancel</button>
@@ -529,7 +530,7 @@ function loadJson(json, fileName, fromSession){
   S.entries = json.entries.map((e,i) => {
     const tr = {}; S.cultures.forEach(c => tr[c] = (e.translations && typeof e.translations[c]==="string") ? e.translations[c] : "");
     const location = e.location||"";
-    return { i, ns:e.namespace||"", key:e.key||"", source:e.source||"", location, folder:e.folder||folderFromLocation(location), tr, outdated:e.outdated||{}, split:!!e._split, skip:(typeof e._skip === "boolean" ? e._skip : undefined) };
+    return { i, ns:e.namespace||"", key:e.key||"", source:e.source||"", location, folder:e.folder||folderFromLocation(location), tr, outdated:e.outdated||{}, split:!!e._split, added:!!e._added, skip:(typeof e._skip === "boolean" ? e._skip : undefined) };
   });
   S.culture = S.cultures.includes(S.culture) ? S.culture : (S.cultures[0] || null);
   buildGroups();
@@ -636,8 +637,12 @@ function mergeWith(json, name){
     delete out._skip; if(c && typeof c._skip === "boolean") out._skip = c._skip;
     return out;
   });
+  // Texts added on the website (like the Language title) stay, unless the new export now has them itself.
+  const baseKeys = new Set(entries.map(k));
+  cur.entries.filter(e => e._added && !baseKeys.has(k(e))).forEach(e => entries.push(e));
   const newTexts = base === json ? entries.filter(e => !curMap.has(k(e))).length : 0;
   const merged = Object.assign({}, base, {
+    nsmLanguageKey: cur.nsmLanguageKey || json.nsmLanguageKey,
     entries, cultures,
     addedCultures: cultures.filter(c => !original.has(c)),
     removedCultures: [...original].filter(c => !cultures.includes(c))
@@ -998,6 +1003,7 @@ function buildExport(){
     const o = { namespace:e.ns, key:e.key, source:e.source, location:e.location, folder:e.folder, translations:e.tr };
     if(e.outdated && Object.keys(e.outdated).length) o.outdated = e.outdated;
     if(e.split) o._split = true;
+    if(e.added) o._added = true;
     if(typeof e.skip === "boolean") o._skip = e.skip;
     return o;
   });
@@ -1376,6 +1382,7 @@ async function importSheet(file){
 
 
 /* ---------- Nice Settings Menu: Language Option Switcher ---------- */
+try{ localStorage.removeItem("nlt.nsmKey"); }catch(e){}
 const NSM_DOCS = "https://niceshadow.gitbook.io/nice-settings-menu-v2/getting-started/localization-languages";
 /* Language names in their own language, as games show them. Anything not listed comes from the browser. */
 const NATIVE_NAMES = {
@@ -1515,13 +1522,15 @@ function parseLocKey(raw){
 function askNsmKey(){
   return new Promise(resolve => {
     const input = $("nsmKeyInput");
-    try{ input.value = localStorage.getItem("nlt.nsmKey") || ""; }catch(e){ input.value = ""; }
+    // Only the key confirmed for this project (kept in its JSON); a new project starts empty.
+    const saved = S.root && S.root.nsmLanguageKey && S.root.nsmLanguageKey.key ? S.root.nsmLanguageKey.key : "";
+    input.value = saved;
+    $("nsmKeySaved").hidden = !saved;
     $("nsmKeyModal").hidden = false; input.focus(); input.select();
     const done = v => { $("nsmKeyModal").hidden = true; $("nsmKeyOk").onclick = $("nsmKeyCancel").onclick = null; input.onkeydown = null; document.removeEventListener("keydown", onEsc, true); resolve(v); };
     const ok = () => {
       const k = parseLocKey(input.value);
       if(!k){ toast("Enter the localization key of the Language title first."); input.focus(); return; }
-      try{ localStorage.setItem("nlt.nsmKey", input.value.trim()); }catch(e){}
       done(k);
     };
     const onEsc = e => { if(e.key === "Escape" && !$("nsmKeyModal").hidden){ e.stopPropagation(); done(null); } };
@@ -1530,23 +1539,32 @@ function askNsmKey(){
     input.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); ok(); } };
   });
 }
-/* Put the "Language" row into the text with that key; add the text if the file doesn't have it yet. */
+/* Put the "Language" row into the text with that key. One text per key: if the project already has
+   it (from Unreal or an earlier import), that one is used; otherwise it is added. Either way it is
+   translated separately, so other "Language" texts in the game keep their own translation. */
 function applyNsmTitle(row, k, colCode){
-  let ent = S.entries.find(e => e.key === k.key && (k.ns == null || e.ns === k.ns)) || S.entries.find(e => e.key === k.key);
+  const prev = S.root.nsmLanguageKey;
+  const findKey = (key, ns) => S.entries.find(e => e.key === key && (ns == null || e.ns === ns)) || S.entries.find(e => e.key === key);
+  let ent = findKey(k.key, k.ns);
+  // The title now has another key: drop the old title text if it was only added here (Unreal never had it).
+  if(prev && prev.key !== k.key){
+    const old = findKey(prev.key, prev.ns);
+    if(old && old.added && old !== ent){ S.entries.splice(S.entries.indexOf(old), 1); S.entries.forEach((e, i) => { e.i = i; }); }
+  }
   let created = false;
   if(!ent){
     ent = { i:S.entries.length, ns:k.ns || "", key:k.key, source:"Language", location:"/Game/NiceSettingsMenu/UI/Language Option Switcher",
-      folder:"Content/NiceSettingsMenu/UI", tr:{}, outdated:{}, split:false, skip:undefined };
+      folder:"Content/NiceSettingsMenu/UI", tr:{}, outdated:{}, split:false, added:true, skip:undefined };
     S.cultures.forEach(c => { ent.tr[c] = ""; });
     S.entries.push(ent); created = true;
-  } else if(S.entries.some(e => e !== ent && e.source === ent.source)){
-    ent.split = true;   // other texts with the same words keep their own translation
   }
+  if(S.entries.some(e => e !== ent && e.source === ent.source)) ent.split = true;
   let updated = 0;
   for(const [i, c] of colCode){
     const v = row[i] == null ? "" : String(row[i]);
     if(v.trim() && ent.tr[c] !== v){ ent.tr[c] = v; updated++; }
   }
+  S.root.nsmLanguageKey = { ns: ent.ns, key: ent.key };
   buildGroups();
   return { created, updated };
 }
