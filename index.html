@@ -758,6 +758,7 @@ const NO_TRANSLATE_NAMES = new Set([
 function autoSkip(text){
   const raw = String(text).trim();
   if(NO_TRANSLATE_NAMES.has(raw.replace(/\s+/g, " ").toLowerCase())) return true;   // "NVIDIA DLSS", "vsync"
+  if(raw === "OPTION MISSING") return true;   // Nice Settings Menu placeholder; only in capitals
   if(raw.length > 1 && raw.startsWith("[") && raw.endsWith("]")) return true;        // "[user desktop resolution]"
   // "x", "X", "i", "?": single characters, except Chinese, Japanese and Korean ones, which are real words.
   if([...raw].length === 1 && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(raw)) return true;
@@ -993,14 +994,21 @@ function checkSession(){
 }
 
 /* ---------- Export ---------- */
-function buildExport(){
+/* forUnreal: the downloaded file. Texts that don't need translating get the source text in every
+   language, so Unreal shows the source and old translations there are replaced (empty ones would be
+   skipped by the importer). The translations typed here are kept on the page and in the browser. */
+function buildExport(forUnreal){
   const out = Object.assign({}, S.root);
+  const skipped = new Set();
+  if(forUnreal) S.groups.forEach(g => { if(isSkipped(g)) g.members.forEach(m => skipped.add(m)); });
   out.cultures = S.cultures;
   out.addedCultures = [...S.added].filter(c => S.cultures.includes(c));
   out.removedCultures = [...S.removed].filter(c => !S.cultures.includes(c));
   out.editedAt = new Date().toISOString();
   out.entries = S.entries.map(e => {
-    const o = { namespace:e.ns, key:e.key, source:e.source, location:e.location, folder:e.folder, translations:e.tr };
+    let tr = e.tr;
+    if(skipped.has(e)){ tr = {}; S.cultures.forEach(c => { tr[c] = e.source; }); }
+    const o = { namespace:e.ns, key:e.key, source:e.source, location:e.location, folder:e.folder, translations:tr };
     if(e.outdated && Object.keys(e.outdated).length) o.outdated = e.outdated;
     if(e.split) o._split = true;
     if(e.added) o._added = true;
@@ -1026,7 +1034,7 @@ async function saveFile(name, data, mime, doneMsg){
   }catch(err){ toast("Downloading isn’t available here: " + err.message); return false; }
 }
 async function exportJson(){
-  const text = JSON.stringify(buildExport(), null, 1);
+  const text = JSON.stringify(buildExport(true), null, 1);
   const name = S.fileName.replace(/\.json$/i, "") + ".json";
   await saveFile(name, text, "application/json", "Downloaded. In Unreal, use Import translations in the Nice Localization Toolkit window.");
 }
